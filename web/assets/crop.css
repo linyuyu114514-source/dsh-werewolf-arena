@@ -1,0 +1,111 @@
+/* ============================================================
+   大肥鱼狼人杀 · 头像裁剪弹层
+   ============================================================ */
+
+.crop-modal{
+  position:fixed;inset:0;z-index:80;
+  display:none;align-items:center;justify-content:center;
+  padding:20px;
+  background:rgba(3,5,10,.82);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.crop-modal.is-open{display:flex;animation:viewIn .3s var(--ease) both}
+
+.crop-box{
+  width:100%;max-width:420px;
+  display:flex;flex-direction:column;gap:18px;
+  padding:24px 22px 20px;border-radius:22px;
+  background:linear-gradient(165deg,rgba(22,30,46,.98),rgba(10,15,25,.98));
+  border:1px solid var(--line);
+  box-shadow:0 40px 90px -30px #000;
+}
+.crop-head h3{margin:0 0 6px;font-size:17px;font-weight:700}
+.crop-head p{margin:0;font-size:12px;color:var(--faint);line-height:1.6}
+
+/* 裁剪舞台 */
+.crop-stage{
+  position:relative;width:100%;aspect-ratio:1;max-height:46vh;
+  margin:0 auto;border-radius:16px;overflow:hidden;
+  background:
+    repeating-conic-gradient(rgba(255,255,255,.045) 0% 25%,transparent 0% 50%) 50%/18px 18px,
+    #05080f;
+  border:1px solid var(--line-soft);
+  touch-action:none;cursor:grab;
+}
+.crop-stage.is-dragging{cursor:grabbing}
+#cropCanvas{display:block;width:100%;height:100%}
+
+/* 圆形遮罩：中间透亮，四周压暗 */
+.crop-mask{
+  position:absolute;inset:0;pointer-events:none;
+  border-radius:16px;
+  box-shadow:0 0 0 9999px rgba(3,6,12,.62) inset;
+  -webkit-mask-image:radial-gradient(circle at 50% 50%,transparent 0 49.6%,#000 50%);
+  mask-image:radial-gradient(circle at 50% 50%,transparent 0 49.6%,#000 50%);
+}
+.crop-ring{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:99%;aspect-ratio:1;border-radius:50%;
+  border:1.5px solid rgba(242,198,109,.75);
+  box-shadow:0 0 0 1px rgba(0,0,0,.5),0 0 26px rgba(242,198,109,.24);
+  pointer-events:none;
+}
+.crop-cross{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:14px;height:14px;pointer-events:none;opacity:.35;
+}
+.crop-cross::before,.crop-cross::after{
+  content:'';position:absolute;background:#fff;
+}
+.crop-cross::before{left:0;top:6.5px;width:14px;height:1px}
+.crop-cross::after{top:0;left:6.5px;height:14px;width:1px}
+
+/* 缩放滑块 */
+.crop-zoom{display:flex;align-items:center;gap:12px}
+.crop-zoom span{font-size:11px;color:var(--faint);letter-spacing:.1em;flex:0 0 auto}
+#cropZoom{
+  -webkit-appearance:none;appearance:none;
+  flex:1;height:4px;border-radius:2px;outline:none;
+  background:rgba(255,255,255,.12);
+  cursor:pointer;
+}
+#cropZoom::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;
+  background:linear-gradient(180deg,#f7d78e,#d8a03a);
+  box-shadow:0 2px 8px rgba(0,0,0,.6);
+  cursor:grab;
+}
+#cropZoom::-moz-range-thumb{
+  width:16px;height:16px;border:0;border-radius:50%;
+  background:linear-gradient(180deg,#f7d78e,#d8a03a);
+  box-shadow:0 2px 8px rgba(0,0,0,.6);
+}
+
+.crop-foot{display:flex;gap:10px;justify-content:flex-end}
+.crop-foot .btn-primary{padding:12px 28px;font-size:14px}
+
+/* 头像网格里的「上传」格 */
+.avatar-cell[data-upload] .cell-inner{
+  display:grid;place-items:center;
+  background:rgba(242,198,109,.07);
+  border:1.5px dashed rgba(242,198,109,.45);
+  opacity:1;
+}
+.avatar-cell[data-upload] .cell-inner svg{width:22px;height:22px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
+.avatar-cell[data-upload]:hover .cell-inner{background:rgba(242,198,109,.14)}
+.avatar-cell[data-upload] .cell-inner{position:relative;overflow:hidden}
+.avatar-cell[data-upload] .cell-inner img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-cell[data-upload] .cell-inner .cell-edit{
+  position:absolute;right:4px;bottom:4px;
+  width:13px;height:13px;padding:2px;box-sizing:content-box;
+  stroke:#0b0f18;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;
+  background:var(--gold);border-radius:50%;
+}
+.avatar-cell[data-upload].is-active::after{border-color:var(--gold)}
+.avatar-cell[data-upload].is-active .cell-inner{border-style:solid;border-color:var(--gold)}
+
+@media (max-width:540px){
+  .crop-box{padding:20px 16px 16px;gap:14px}
+  .crop-stage{max-height:38vh}
+}

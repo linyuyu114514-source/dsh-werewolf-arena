@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06080e">
+<meta name="description" content="大肥鱼狼人杀 · 子代理陪玩的单机狼人杀">
+<title>大肥鱼狼人杀</title>
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/crop.css">
+<link rel="stylesheet" href="assets/game.css">
+<link rel="stylesheet" href="assets/rolecard.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0f1a'/%3E%3Cpath d='M50 20 L72 29 L79 52 Q79 72 50 84 Q21 72 21 52 L28 29 Z' fill='%23f2c66d'/%3E%3Cpath d='M28 29 L20 14 L40 23 Z' fill='%23f2c66d'/%3E%3Cpath d='M72 29 L80 14 L60 23 Z' fill='%23f2c66d'/%3E%3Cpath d='M34 46 L45 49 L34 54 Z' fill='%23150d02'/%3E%3Cpath d='M66 46 L55 49 L66 54 Z' fill='%23150d02'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- ================= 天象背景（昼夜共用一套图层） ================= -->
+<div class="sky" aria-hidden="true">
+  <div class="stars" id="stars"></div>
+  <div class="sun"></div>
+  <div class="moon"></div>
+  <div class="clouds"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="birds"><i></i><i></i><i></i></div>
+  <div class="ridge ridge-far"></div>
+  <div class="ridge ridge-mid"></div>
+  <div class="ridge ridge-near"></div>
+  <div class="fog"></div>
+</div>
+
+<div id="app">
+
+  <!-- ============================================================
+       视图一：创建档案（名字 + 头像）
+       ============================================================ -->
+  <section class="view is-active" id="view-create" aria-labelledby="createTitle">
+
+    <header class="brand">
+      <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <linearGradient id="bm" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#fbe0a4"/>
+            <stop offset="1" stop-color="#c9922f"/>
+          </linearGradient>
+        </defs>
+        <path d="M50 16 L74 26 L82 52 Q82 74 50 88 Q18 74 18 52 L26 26 Z" fill="url(#bm)"/>
+        <path d="M26 26 L18 8 L41 18 Z" fill="url(#bm)"/>
+        <path d="M74 26 L82 8 L59 18 Z" fill="url(#bm)"/>
+        <path d="M33 45 L45 48 L33 54 Z" fill="#150d02"/>
+        <path d="M67 45 L55 48 L67 54 Z" fill="#150d02"/>
+        <path d="M50 61 L43 71 L50 78 L57 71 Z" fill="#150d02"/>
+      </svg>
+      <h1 class="brand-title">大肥鱼狼人杀</h1>
+      <p class="brand-sub">WEREWOLF · OFFLINE</p>
+    </header>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2 id="createTitle">先做一个你自己</h2>
+        <p>名字和形象会显示在牌桌上。之后随时可以改。</p>
+      </div>
+
+      <!-- 当前选中预览 -->
+      <div class="avatar-stage">
+        <div class="avatar-preview" id="avatarPreview" aria-hidden="true"></div>
+        <div class="avatar-stage-meta">
+          <div class="avatar-label" id="avatarName">暗夜狼</div>
+          <div class="avatar-hint">挑一个内置形象，<br>或者上传自己的照片。</div>
+        </div>
+      </div>
+
+      <!-- 头像网格 -->
+      <div class="avatar-grid" id="avatarGrid" role="radiogroup" aria-label="选择头像"></div>
+
+      <!-- 名字 -->
+      <div class="field">
+        <label class="field-label" for="nameInput">你的名字</label>
+        <div class="field-row">
+          <input id="nameInput" type="text" maxlength="12" autocomplete="off"
+                 spellcheck="false" placeholder="2 – 12 个字" aria-describedby="nameHint">
+          <button class="btn-icon" id="randomName" type="button"
+                  title="随机取个名字" aria-label="随机取个名字">⟳</button>
+        </div>
+        <div class="field-hint" id="nameHint">0 / 12</div>
+      </div>
+
+      <button class="btn-primary btn-lg" id="confirmProfile" type="button" disabled>
+        进入牌桌
+      </button>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       视图二：模式选择
+       ============================================================ -->
+  <section class="view" id="view-modes" aria-labelledby="modesTitle">
+
+    <div class="topbar">
+      <div class="me">
+        <div class="me-avatar" id="meAvatar" aria-hidden="true"></div>
+        <div>
+          <div class="me-name" id="meName">—</div>
+          <div class="me-tag">PLAYER</div>
+        </div>
+      </div>
+      <button class="btn-ghost btn-sm" id="editProfile" type="button">更换形象</button>
+    </div>
+
+    <div class="modes-head">
+      <h2 id="modesTitle">选一局</h2>
+      <p>每种模式里，除你以外的所有玩家都由子代理扮演。</p>
+    </div>
+
+    <!-- 开局方式：普通（全随机） / 自选（自己定身份与座位） -->
+    <div class="playmode">
+      <div class="pm-head">
+        <span class="pm-label">开局方式</span>
+        <div class="pm-switch" id="pmSwitch" role="radiogroup" aria-label="开局方式">
+          <button type="button" class="pm-opt is-on" data-playmode="normal"
+                  role="radio" aria-checked="true">普通模式</button>
+          <button type="button" class="pm-opt" data-playmode="custom"
+                  role="radio" aria-checked="false">自选模式</button>
+        </div>
+      </div>
+      <p class="pm-note" id="pmNote">身份和座位全部随机发放。</p>
+    </div>
+
+    <!-- 自选模式面板：身份 + 座位 -->
+    <div class="custom-panel" id="customPanel" hidden>
+      <div class="cp-block">
+        <span class="cp-label">我的身份</span>
+        <div class="cp-roles" id="cpRoles" role="radiogroup" aria-label="选择身份"></div>
+      </div>
+      <div class="cp-block">
+        <span class="cp-label">我的座位</span>
+        <div class="cp-seats" id="cpSeats" role="radiogroup" aria-label="选择座位号"></div>
+      </div>
+    </div>
+
+    <div class="mode-grid" id="modeGrid" role="radiogroup" aria-label="选择游戏模式"></div>
+
+    <div class="modes-foot">
+      <button class="btn-primary btn-lg" id="startGame" type="button" disabled>
+        开始游戏
+      </button>
+      <p class="foot-note" id="modeNote">先选一个模式</p>
+      <p class="backend-note" id="backendNote" hidden></p>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       视图三：局内（白天 / 黑夜通用骨架）
+       ------------------------------------------------------------
+       同一套 DOM，靠 data-phase 切换皮肤与交互区：
+         night → 冷调、私密行动面板、输入框隐藏
+         day   → 暖调、公开讨论、输入框可见
+       ============================================================ -->
+  <section class="view" id="view-game" data-phase="night" aria-labelledby="dayTitle">
+
+    <!-- ---------- 装饰图层（纯视觉，不参与交互） ---------- -->
+    <div class="game-deco" aria-hidden="true">
+      <svg class="deco-wolf" viewBox="0 0 200 200">
+        <path d="M100 26 L150 48 L166 104 Q166 156 100 180 Q34 156 34 104 L50 48 Z"/>
+        <path d="M50 48 L34 6 L84 30 Z"/>
+        <path d="M150 48 L166 6 L116 30 Z"/>
+        <path class="deco-eye" d="M66 92 L92 98 L66 110 Z"/>
+        <path class="deco-eye" d="M134 92 L108 98 L134 110 Z"/>
+        <path d="M100 128 L86 148 L100 162 L114 148 Z"/>
+      </svg>
+      <div class="deco-halo"></div>
+      <svg class="deco-branch deco-branch-l" viewBox="0 0 120 200" preserveAspectRatio="none">
+        <path d="M6 200 C18 140 10 96 26 52 C34 30 44 14 58 0"/>
+        <path d="M24 132 C40 128 52 116 60 100"/>
+        <path d="M16 96 C30 88 40 74 44 58"/>
+        <path d="M34 60 C48 54 58 42 64 26"/>
+        <path d="M10 168 C26 164 40 152 48 136"/>
+      </svg>
+      <svg class="deco-branch deco-branch-r" viewBox="0 0 120 200" preserveAspectRatio="none">
+        <path d="M6 200 C18 140 10 96 26 52 C34 30 44 14 58 0"/>
+        <path d="M24 132 C40 128 52 116 60 100"/>
+        <path d="M16 96 C30 88 40 74 44 58"/>
+        <path d="M34 60 C48 54 58 42 64 26"/>
+        <path d="M10 168 C26 164 40 152 48 136"/>
+      </svg>
+    </div>
+
+    <!-- ---------- 天象栏 ---------- -->
+    <header class="game-top">
+      <div class="day-orb" aria-hidden="true">
+        <span class="orb orb-moon">
+          <svg viewBox="0 0 64 64">
+            <defs>
+              <radialGradient id="gMoon" cx="36%" cy="32%">
+                <stop offset="0" stop-color="#f8fbff"/>
+                <stop offset=".55" stop-color="#c8d8f5"/>
+                <stop offset="1" stop-color="#8ba2cb"/>
+              </radialGradient>
+            </defs>
+            <path d="M40 6a26 26 0 1 0 18 44A22 22 0 0 1 40 6Z" fill="url(#gMoon)"/>
+            <circle cx="30" cy="22" r="3.2" fill="#8ba2cb" opacity=".45"/>
+            <circle cx="23" cy="38" r="2.2" fill="#8ba2cb" opacity=".35"/>
+          </svg>
+        </span>
+        <span class="orb orb-sun">
+          <svg viewBox="0 0 64 64">
+            <defs>
+              <radialGradient id="gSun" cx="50%" cy="44%">
+                <stop offset="0" stop-color="#fffdf2"/>
+                <stop offset=".6" stop-color="#ffd071"/>
+                <stop offset="1" stop-color="#f79a3c"/>
+              </radialGradient>
+            </defs>
+            <g stroke="#ffc65e" stroke-width="3" stroke-linecap="round" opacity=".85">
+              <path d="M32 4v6M32 54v6M4 32h6M54 32h6M12 12l4 4M48 48l4 4M52 12l-4 4M16 48l-4 4"/>
+            </g>
+            <circle cx="32" cy="32" r="15" fill="url(#gSun)"/>
+          </svg>
+        </span>
+      </div>
+
+      <div class="day-meta">
+        <h2 class="day-count" id="dayTitle">第 <b id="dayNum">1</b> 天</h2>
+        <div class="day-sub">
+          <span class="day-phase" id="phaseName">天黑请闭眼</span>
+          <span class="day-dot">·</span>
+          <span class="day-mode" id="gameModeLabel">—</span>
+        </div>
+        <ol class="phase-track" id="phaseTrack" aria-label="阶段进度"></ol>
+      </div>
+
+      <div class="game-top-right">
+
+        <div class="alive" title="存活人数">
+          <span class="alive-num" id="aliveNum">0</span>
+          <span class="alive-total">/ <span id="aliveTotal">0</span> 存活</span>
+        </div>
+
+        <!-- 身份胶囊：点击展开完整身份牌 -->
+        <button class="id-chip" id="idChip" type="button" aria-expanded="false"
+                aria-controls="idPop" aria-label="你的身份牌">
+          <span class="id-chip-orb" id="idOrb" aria-hidden="true"></span>
+          <span class="id-chip-text">
+            <b id="idName">—</b>
+            <i id="idCamp">好人阵营</i>
+          </span>
+        </button>
+
+        <div class="id-pop" id="idPop" hidden>
+          <div class="id-pop-card" id="idPopCard"></div>
+          <ul class="id-extra" id="idExtra"></ul>
+          <div class="id-state" id="idState">身份保密</div>
+        </div>
+
+        <div class="demo-bar" id="demoBar" role="group" aria-label="对局控制">
+          <button type="button" data-demo="restart">重开</button>
+          <button type="button" data-demo="exit">退出</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ---------- 主舞台：左右头像竖列 + 中央文本框 ---------- -->
+    <div class="board">
+
+      <div class="rail rail-left" id="railLeft" aria-label="左侧玩家"></div>
+
+      <div class="stage-col">
+        <div class="log-head">
+          <span class="hub-dot" aria-hidden="true"></span>
+          <span class="hub-title" id="hubTitle">天黑请闭眼</span>
+          <span class="hub-note" id="hubNote">所有人闭上眼睛</span>
+        </div>
+        <div class="log-box" id="talkLog" role="log" aria-live="polite"></div>
+      </div>
+
+      <div class="rail rail-right" id="railRight" aria-label="右侧玩家"></div>
+
+    </div>
+
+    <!-- ---------- 底部：通用可变操作区 ----------
+         同一块区域，按当前局势切换内容：
+           chips  → 夜间行动 / 投票选择
+           speak  → 轮到你发言时的输入框
+           idle   → 无事可做，只给提示
+         ============================================ -->
+    <section class="action-dock" id="actionDock" data-kind="idle" aria-label="操作区">
+
+      <div class="ad-head">
+        <span class="ad-title" id="adTitle">等待中</span>
+        <span class="ad-hint" id="adHint"></span>
+      </div>
+
+      <div class="ad-chips" id="adChips"></div>
+
+      <div class="ad-confirm" id="adConfirm" hidden>
+        <span class="ad-picked" id="adPicked">还没选人</span>
+        <button type="button" id="adConfirmBtn" disabled>确认</button>
+      </div>
+
+      <div class="ad-speak" id="adSpeak" hidden>
+        <input id="talkBox" type="text" maxlength="140" autocomplete="off" spellcheck="false"
+               placeholder="说出你的判断…" aria-label="你的发言">
+        <button id="talkSend" type="button">发送</button>
+      </div>
+
+      <p class="ad-idle" id="adIdle" hidden>这一轮你无需行动。</p>
+
+    </section>
+  </section>
+
+</div>
+
+<div class="phase-curtain" id="phaseCurtain" aria-hidden="true"><span id="curtainText">天黑请闭眼</span></div>
+
+<!-- ================= 开局身份揭示 ================= -->
+<div class="role-reveal" id="roleReveal" hidden>
+  <div class="rr-inner">
+    <p class="rr-eyebrow">你的身份是</p>
+    <div class="rr-card" id="revealCard"></div>
+    <p class="rr-tip">只给你看，别人不知道</p>
+    <button class="btn-primary btn-lg" id="revealOk" type="button">我知道了</button>
+  </div>
+</div>
+
+<!-- ================= 对局中止 ================= -->
+<div class="match-error" id="matchError" hidden>
+  <div class="me-inner">
+    <div class="me-icon" aria-hidden="true">
+      <svg viewBox="0 0 64 64" width="64" height="64">
+        <circle cx="32" cy="32" r="26" fill="none" stroke="currentColor" stroke-width="3" opacity=".55"/>
+        <path d="M32 17v20" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+        <circle cx="32" cy="45.5" r="2.8" fill="currentColor"/>
+      </svg>
+    </div>
+    <p class="me-title">本局已中止</p>
+    <p class="me-text" id="meText">子代理没有回应，本局已中止。</p>
+    <button class="btn-primary btn-lg" id="meBack" type="button">返回并重试</button>
+  </div>
+</div>
+
+<!-- ================= 结算 ================= -->
+<div class="settle" id="settleModal" hidden>
+  <div class="st-inner">
+    <p class="st-eyebrow" id="stEyebrow">本局结束</p>
+    <h2 class="st-title" id="stTitle">好人阵营胜利</h2>
+    <p class="st-reason" id="stReason"></p>
+
+    <div class="st-roster" id="stRoster"></div>
+
+    <div class="st-foot">
+      <button class="btn-primary btn-lg" id="stAgain" type="button">再来一局</button>
+      <button class="btn-ghost btn-lg" id="stHome" type="button">返回首页</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/avatars.js"></script>
+<script src="assets/crop.js"></script>
+<script src="assets/store.js"></script>
+<script src="assets/modes.js"></script>
+<script src="assets/rolecard.js"></script>
+<script src="assets/rules.js"></script>
+<script src="assets/game.js"></script>
+<script src="assets/bridge.js"></script>
+<script src="assets/match.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

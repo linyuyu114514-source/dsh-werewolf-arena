@@ -1,0 +1,163 @@
+/* ============================================================
+   大肥鱼狼人杀 · 身份卡样式
+   ------------------------------------------------------------
+   全部吃全局 CSS 变量，所以昼夜换肤自动跟随：
+     夜晚 → 深色底 + 金线
+     白天 → 暖白底 + 棕线
+   ============================================================ */
+
+/* ---------- 卡片主体 ---------- */
+.role-card{
+  position:relative;
+  width:100%;
+  max-width:264px;
+  padding:14px 16px 16px;
+  border-radius:18px;
+  display:flex;flex-direction:column;gap:10px;
+  background:linear-gradient(168deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+  border:1px solid var(--line,rgba(255,255,255,.1));
+  box-shadow:0 26px 60px -34px #000,inset 0 1px 0 rgba(255,255,255,.06);
+  overflow:hidden;
+}
+.role-card::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 80% at 50% -10%,rgba(242,198,109,.16),transparent 62%);
+}
+.role-card[data-camp="wolf"]::before{
+  background:radial-gradient(120% 80% at 50% -10%,rgba(167,139,250,.22),transparent 62%);
+}
+
+/* ---------- 四角装饰 ---------- */
+.rc-corner{
+  position:absolute;width:12px;height:12px;pointer-events:none;
+  border:1.5px solid rgba(242,198,109,.55);
+}
+.rc-corner.tl{top:7px;left:7px;border-right:0;border-bottom:0;border-radius:5px 0 0 0}
+.rc-corner.tr{top:7px;right:7px;border-left:0;border-bottom:0;border-radius:0 5px 0 0}
+.rc-corner.bl{bottom:7px;left:7px;border-right:0;border-top:0;border-radius:0 0 0 5px}
+.rc-corner.br{bottom:7px;right:7px;border-left:0;border-top:0;border-radius:0 0 5px 0}
+.role-card[data-camp="wolf"] .rc-corner{border-color:rgba(167,139,250,.6)}
+
+/* ---------- 卡头：阵营 + 编号 ---------- */
+.rc-head{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:10.5px;letter-spacing:.18em;font-weight:700;
+  color:rgba(242,198,109,.9);
+}
+.role-card[data-camp="wolf"] .rc-head{color:rgba(196,181,253,.95)}
+.rc-no{font-variant-numeric:tabular-nums;opacity:.7}
+
+/* ---------- 图形区 ---------- */
+.rc-art{
+  position:relative;
+  align-self:center;
+  width:100%;max-width:150px;aspect-ratio:1/1;
+}
+.rc-svg{width:100%;height:100%;display:block;overflow:visible}
+
+/* 图形配色：默认按角色主色，靠 data-role 覆盖 */
+.rc-svg .rc-fill{fill:var(--rc-main,#f2c66d)}
+.rc-svg .rc-line{fill:none;stroke:var(--rc-main,#f2c66d);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.rc-svg .rc-dark{fill:var(--rc-dark,#0a0f1a)}
+.rc-svg .rc-band{fill:var(--rc-band,#c9922f)}
+.rc-svg .rc-glow{fill:var(--rc-glow,rgba(242,198,109,.16))}
+
+/* 六个角色各自的色板 */
+.role-card[data-role="villager"]{--rc-main:#5eead4;--rc-band:#2dd4bf;--rc-glow:rgba(94,234,212,.15);--rc-dark:#07130f}
+.role-card[data-role="werewolf"]{--rc-main:#a78bfa;--rc-band:#7c5cf5;--rc-glow:rgba(167,139,250,.2);--rc-dark:#0b0716}
+.role-card[data-role="seer"]    {--rc-main:#7dd3fc;--rc-band:#38bdf8;--rc-glow:rgba(125,211,252,.16);--rc-dark:#04101a}
+.role-card[data-role="witch"]   {--rc-main:#f0abfc;--rc-band:#d946ef;--rc-glow:rgba(240,171,252,.16);--rc-dark:#14061a}
+.role-card[data-role="hunter"]  {--rc-main:#fca5a5;--rc-band:#ef4444;--rc-glow:rgba(252,165,165,.16);--rc-dark:#190708}
+.role-card[data-role="guard"]   {--rc-main:#fcd34d;--rc-band:#f59e0b;--rc-glow:rgba(252,211,77,.16);--rc-dark:#1a1204}
+
+/* ---------- 卡身文字 ---------- */
+.rc-body{display:flex;flex-direction:column;gap:4px;text-align:center}
+.rc-name{
+  margin:0;font-size:20px;font-weight:800;letter-spacing:.06em;
+  color:var(--rc-main,#f2c66d);
+  text-shadow:0 0 22px var(--rc-glow,rgba(242,198,109,.4));
+}
+.rc-en{
+  margin:0;font-size:9.5px;letter-spacing:.28em;font-weight:700;
+  color:var(--dim,#95a9c6);opacity:.85;
+}
+.rc-desc{
+  margin:2px 0 0;font-size:12px;line-height:1.55;
+  color:var(--text,#e8eef8);opacity:.82;
+}
+
+/* ---------- 标签 ---------- */
+.rc-tags{
+  display:flex;flex-wrap:wrap;gap:5px;justify-content:center;
+  margin:0;padding:0;list-style:none;
+}
+.rc-tags li{
+  padding:3px 8px;border-radius:999px;
+  font-size:10.5px;letter-spacing:.04em;
+  color:var(--dim,#c6d3e6);
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.1);
+}
+
+/* ============================================================
+   白天：换暖白
+   ============================================================ */
+body[data-phase="day"] .role-card{
+  background:linear-gradient(168deg,rgba(255,252,244,.96),rgba(255,240,214,.86));
+  border-color:rgba(158,110,50,.26);
+  box-shadow:0 26px 54px -34px rgba(120,74,26,.6),inset 0 1px 0 rgba(255,255,255,.95);
+}
+body[data-phase="day"] .role-card::before{
+  background:radial-gradient(120% 80% at 50% -10%,rgba(242,198,109,.3),transparent 62%);
+}
+body[data-phase="day"] .role-card[data-camp="wolf"]::before{
+  background:radial-gradient(120% 80% at 50% -10%,rgba(140,104,224,.22),transparent 62%);
+}
+body[data-phase="day"] .rc-corner{border-color:rgba(201,146,47,.65)}
+body[data-phase="day"] .role-card[data-camp="wolf"] .rc-corner{border-color:rgba(140,104,224,.6)}
+body[data-phase="day"] .rc-head{color:#a06a12}
+body[data-phase="day"] .role-card[data-camp="wolf"] .rc-head{color:#6a3fa0}
+body[data-phase="day"] .rc-en{color:#8a6a3c}
+body[data-phase="day"] .rc-desc{color:#4a3214}
+body[data-phase="day"] .rc-tags li{
+  color:#6d4d24;background:rgba(255,255,255,.66);border-color:rgba(158,110,50,.22);
+}
+/* 白天图形留白处要浅，别留黑窟窿 */
+body[data-phase="day"] .role-card[data-role="villager"]{--rc-dark:#ffffff}
+body[data-phase="day"] .role-card[data-role="werewolf"]{--rc-dark:#fff6e4}
+body[data-phase="day"] .role-card[data-role="seer"]    {--rc-dark:#ffffff}
+body[data-phase="day"] .role-card[data-role="witch"]   {--rc-dark:#fff6e4}
+body[data-phase="day"] .role-card[data-role="hunter"]  {--rc-dark:#fff6e4}
+body[data-phase="day"] .role-card[data-role="guard"]   {--rc-dark:#fff6e4}
+body[data-phase="day"] .role-card[data-role="werewolf"]{--rc-main:#7c5cf5}
+body[data-phase="day"] .role-card[data-role="seer"]    {--rc-main:#1e7fb8}
+body[data-phase="day"] .role-card[data-role="witch"]   {--rc-main:#b328c9}
+body[data-phase="day"] .role-card[data-role="villager"]{--rc-main:#0d9488}
+body[data-phase="day"] .role-card[data-role="hunter"]  {--rc-main:#dc2626}
+body[data-phase="day"] .role-card[data-role="guard"]   {--rc-main:#b45309}
+
+/* ============================================================
+   身份弹层里的紧凑版
+   ============================================================ */
+.id-pop .role-card{
+  max-width:none;
+  padding:12px 13px 13px;
+  gap:8px;
+  background:transparent;
+  border:0;box-shadow:none;
+  border-radius:0;
+}
+.id-pop .role-card::before{display:none}
+.id-pop .rc-corner{display:none}
+.id-pop .rc-art{max-width:104px}
+.id-pop .rc-name{font-size:17px}
+.id-pop .rc-desc{font-size:11.5px}
+.id-pop .rc-tags li{font-size:10px;padding:2px 7px}
+
+/* ============================================================
+   独立展示页（身份卡预览用）
+   ============================================================ */
+.card-stage{
+  display:flex;flex-wrap:wrap;gap:18px;justify-content:center;
+  padding:18px;
+}
