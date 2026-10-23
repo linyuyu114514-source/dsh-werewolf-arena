@@ -77,10 +77,25 @@ export const DSH_NODE = (function pick() {
   return '';
 })();
 
-/* ---------- 5. 凭据 ---------- */
+/* ---------- 5. 真实 DSH_HOME（桌面版的家目录） ----------
+   游戏自己跑在临时 DSH_HOME 里（局末零残留），但"非官方通道"的登录态、
+   渠道台账、免费通道设置都存在这个真实目录下，所以它是只读的来源。 */
+export const DSH_USER_HOME = (function pick() {
+  const list = [];
+  if (process.env.WW_DSH_USER_HOME) list.push(norm(process.env.WW_DSH_USER_HOME));
+  const home = process.env.USERPROFILE || process.env.HOME || '';
+  if (home) list.push(norm(home) + '/.dsh');
+  if (process.env.DSH_HOME) list.push(norm(process.env.DSH_HOME));
+  for (const p of list) if (exists(p)) return p;
+  return list[0] || '';
+})();
+
+/* ---------- 6. 凭据 ---------- */
 export const DSH_CREDENTIALS = (function pick() {
   const list = [];
   if (process.env.WW_DSH_CREDENTIALS) list.push(norm(process.env.WW_DSH_CREDENTIALS));
+  /* 换了 DSH_HOME（例如别人机器上的另一个家目录）时，"有没有登录态"要按那个目录判 */
+  if (process.env.WW_DSH_USER_HOME) list.push(norm(process.env.WW_DSH_USER_HOME) + '/.credentials.yaml');
   const home = process.env.USERPROFILE || process.env.HOME || '';
   if (home) list.push(norm(home) + '/.dsh/.credentials.yaml');
   if (process.env.DSH_HOME) list.push(norm(process.env.DSH_HOME) + '/.credentials.yaml');

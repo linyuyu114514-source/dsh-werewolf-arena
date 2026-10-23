@@ -1,14 +1,32 @@
 /* 一个 DSH runtime 子进程 = 一局游戏。
    进程里跑 N 个 session（每个座位一个），session 之间上下文完全隔离。
    局末 shutdown + kill，磁盘上不留任何东西（patch 里已关掉 sessions 持久化）。 */
+import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { DSH_EXE, DSH_CLI, authRoute } from './paths.mjs';
 
-/* 单个回合最多等这么久。实测一次行动 2–6 秒，18 秒还没动静就是真卡了。
-   宁可早点报错让玩家重开，也不要干等着。 */
-const TURN_TIMEOUT_MS = 18_000;
+/* 单个回合最多等这么久。
+   官方通道实测一次行动 2–6 秒，18 秒还没动静就是真卡了；
+   非官方渠道（CodeArts、TRAE 这类）服务端更慢，而且模型可能带着推理在跑，
+   实测同一个提示词要几十秒，所以给它 45 秒。WW_TURN_TIMEOUT_MS 可以硬覆盖。 */
+const TURN_TIMEOUT_MS_FAST = 18_000;
+const TURN_TIMEOUT_MS_SLOW = 150_000;
+function isSlowChannel(channel) {
+  return Boolean(channel && channel.plugin);
+}
+function turnTimeoutFor(channel) {
+  const forced = Number(process.env.WW_TURN_TIMEOUT_MS || 0);
+  if (forced > 0) return forced;
+  return isSlowChannel(channel) ? TURN_TIMEOUT_MS_SLOW : TURN_TIMEOUT_MS_FAST;
+}
+/** 慢通道重试一次要再等两分半，不划算：宁可一次问到底，超时就直接报错 */
+export function attemptsFor(channel) {
+  return isSlowChannel(channel) ? 1 : 2;
+}
 const INIT_TIMEOUT_MS = 40_000;
+/* 等"玩家选的通道"在 DSH 里上线：实测第三方渠道从进程启动到出现要 1–4 秒 */
+const PROVIDER_READY_MS = 25_000;
 
 export class DshRuntime extends EventEmitter {
   /**
@@ -16,9 +34,13 @@ export class DshRuntime extends EventEmitter {
    * @param {string} o.patchPath  patch.yml
    * @param {string} o.homeDir    DSH_HOME（临时目录，进程退出后可整目录删除）
    * @param {string} o.cwd        工作目录（沙箱根）
+   * @param {object} [o.channel]   玩家这一局选的通道 {provider, model, reasoningEffort?}
    */
   constructor(o) {
     super();
+    this.channel = o.channel || null;
+    /* 枚举插件把"现在有哪些通道"写在这里；有它就先等着，没有就直接开局 */
+    this.readyFile = o.readyFile || '';
     this.patchPath = o.patchPath;
     this.homeDir = o.homeDir;
     this.cwd = o.cwd || process.cwd();
@@ -35,6 +57,7 @@ export class DshRuntime extends EventEmitter {
     /* sessionId -> 本回合是否已提交（防重复调用） */
     this.turnUsed = new Set();
     this.provider = 'deepseek-account';
+    this.model = 'deepseek-flash';
     /* 子进程 stderr 的尾巴：回合没提交行动时用来解释为什么 */
     this.stderrTail = '';
     /* 最近一轮 turn/end 的 reason，用来解释「为什么没提交行动」 */
@@ -81,19 +104,54 @@ export class DshRuntime extends EventEmitter {
 
       const timer = setTimeout(() => fail(new Error('DSH 启动超时')), INIT_TIMEOUT_MS);
 
-      /* provider 跟着可用身份走：有 API Key 走官方 API，否则走桌面版登录态 */
+      /* 通道优先用玩家选的那个（可能是桌面版里接的非官方渠道）；
+         没选就沿用身份路线：有 API Key 走官方 API，否则走桌面版登录态。
+
+         reasoningEffort 只在玩家明确选了一个、并且那个模型自己声明支持时才带：
+         DSH 对"没声明 reasoning 能力的模型"收到这个字段会直接抛
+         does not support reasoning effort，整局就废了。 */
       const route = authRoute();
-      this.provider = route.provider;
-      this.call('initialize', {
-        cwd: this.cwd,
-        provider: route.provider,
-        model: 'deepseek-flash',
-        reasoningEffort: 'off',
-      }).then(() => {
+      this.provider = (this.channel && this.channel.provider) || route.provider;
+      this.model = (this.channel && this.channel.model) || 'deepseek-flash';
+      const initParams = { cwd: this.cwd, provider: this.provider, model: this.model };
+      if (this.channel && this.channel.reasoningEffort) {
+        initParams.reasoningEffort = this.channel.reasoningEffort;
+      }
+      /* 通道插件上线是异步的：先等它出现，免得 initialize 撞上
+         no adapter registered for provider。等不到也照样往下走——
+         真有问题就让 DSH 自己把话说清楚，而不是我们猜。 */
+      this.waitForProvider(initParams.provider, PROVIDER_READY_MS)
+        .then(() => this.call('initialize', initParams))
+        .then(() => {
         clearTimeout(timer);
         this.ready = true;
         if (!done) { done = true; resolve(this); }
       }, (e) => { clearTimeout(timer); fail(e); });
+    });
+  }
+
+  /**
+   * 等选定的 provider 出现在枚举文件里（枚举插件每几秒写一批）。
+   * @param {string} provider
+   * @param {number} timeoutMs
+   * @returns {Promise<string[]>} 超时也返回：调用方只看等了多久，不看结果
+   */
+  waitForProvider(provider, timeoutMs) {
+    if (!this.readyFile) return Promise.resolve([]);
+    const deadline = Date.now() + timeoutMs;
+    return new Promise((resolve) => {
+      const tick = () => {
+        let ids = [];
+        try {
+          const snaps = JSON.parse(fs.readFileSync(this.readyFile, 'utf8')).snapshots || [];
+          const last = snaps[snaps.length - 1];
+          ids = ((last && last.providers) || []).map((p) => (typeof p === 'string' ? p : p.id));
+        } catch { /* 文件还没写出来 */ }
+        if (ids.indexOf(provider) >= 0) { resolve(ids); return; }
+        if (Date.now() >= deadline) { resolve(ids); return; }
+        setTimeout(tick, 250);
+      };
+      tick();
     });
   }
 
@@ -168,7 +226,7 @@ export class DshRuntime extends EventEmitter {
    */
   async turn(sid, prompt) {
     const release = await this._lock(sid);
-    const waiter = this._waitTurnEnd(sid, TURN_TIMEOUT_MS);
+    const waiter = this._waitTurnEnd(sid, turnTimeoutFor(this.channel));
     try {
       this.turnUsed.delete(sid);
       this.submissions.delete(sid);

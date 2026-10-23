@@ -11,7 +11,11 @@
   'use strict';
 
   var BASE = '';            /* 同源部署，留空 */
-  var TIMEOUT_MS = 50000;   /* 单次行动等这么久还没回应就判失败（后端自己 2×18 秒就会先报错） */
+  /* 单次行动等这么久还没回应就判失败。
+     后端自己会先报错：官方通道 2×18 秒，非官方渠道一次最多 150 秒
+     （那些渠道的服务端确实慢，实测一次发言要一分多钟）。
+     这里给到 170 秒，永远比后端晚一步，别抢在它前面判死。 */
+  var TIMEOUT_MS = 170000;
   
   var matchId = null;
   var starting = null;      /* Promise：开局中 */
@@ -64,6 +68,35 @@
     else if (global.WWToast) WWToast(msg);
   }
 
+  /* 玩家在首页选的 AI 通道。取不到就不带这个字段，
+     后端会用它自己的默认通道开局。 */
+  function channelOf() {
+    var ch = global.WWChannel;
+    if (!ch || typeof ch.get !== 'function') return null;
+    var pick = null;
+    try { pick = ch.get(); } catch (e) { pick = null; }
+    if (!pick || !pick.provider) return null;
+    var out = { provider: String(pick.provider) };
+    if (pick.model) out.model = String(pick.model);
+    if (pick.reasoningEffort) out.reasoningEffort = String(pick.reasoningEffort);
+    return out;
+  }
+
+  /* 开局失败：后端原文同时写到通道面板和底部状态行。
+     玩家换个通道就能直接重开，不用刷新页面。 */
+  function reportOpenError(msg) {
+    var ch = global.WWChannel;
+    if (ch && typeof ch.reportError === 'function') {
+      try { ch.reportError(msg); } catch (e) {}
+    }
+    var el = document.getElementById('backendNote');
+    if (el) {
+      el.hidden = false;
+      el.dataset.state = 'bad';
+      el.textContent = msg;
+    }
+  }
+
   /* 开局：把子代理的座位表交给后端，后端起一个 DSH 子进程 */
   function open(engine, fail) {
     matchId = null;
@@ -83,7 +116,12 @@
       .map(function (s) { return { seat: s.seat, name: s.name }; });
     if (!seats.length) return Promise.resolve(null);
 
-    starting = api('/api/match', { seats: seats }).then(function (j) {
+    var body = { seats: seats };
+    var channel = channelOf();
+    /* 只有玩家真的选了通道才带，字段名按契约：channel:{provider,model,reasoningEffort?} */
+    if (channel) body.channel = channel;
+
+    starting = api('/api/match', body).then(function (j) {
       matchId = j.matchId;
       /* 排队的请求放出去 */
       var q = queue; queue = [];
@@ -92,7 +130,9 @@
       return matchId;
     }).catch(function (e) {
       starting = null;
-      boom('子代理没起来：' + e.message);
+      var msg = '子代理没起来：' + e.message;
+      reportOpenError(msg);
+      boom(msg);
       return null;
     });
     return starting;

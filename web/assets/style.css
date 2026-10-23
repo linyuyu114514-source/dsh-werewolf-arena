@@ -470,3 +470,51 @@ body[data-phase="day"] .fog{
   .custom-panel{grid-template-columns:1fr}
   .pm-head{gap:10px}
 }
+
+/* ============================================================
+   AI 通道（首页「选一局」里选渠道与模型）
+   ------------------------------------------------------------
+   面板自己一块，跟「开局方式」「自选模式」同一层视觉；
+   状态行沿用 .backend-note 那套 data-state 配色习惯。
+   ============================================================ */
+.achannel{
+  width:100%;
+  margin:0 0 14px;
+  padding:12px 16px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:rgba(255,255,255,.03);
+}
+.ac-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.ac-label{font-size:13px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.ac-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.ac-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ac-cap{font-size:11px;color:var(--dim);letter-spacing:.16em}
+.ac-select{
+  appearance:none;width:100%;
+  padding:9px 30px 9px 12px;border-radius:11px;
+  font:inherit;font-size:14px;color:var(--text);
+  border:1px solid var(--line);background:rgba(0,0,0,.34);
+  cursor:pointer;
+  transition:border-color .18s,background .18s;
+  /* 下拉箭头用两层渐变画出来，不引外部素材 */
+  background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 55%,calc(100% - 11px) 55%;
+  background-size:5px 5px,5px 5px;
+  background-repeat:no-repeat;
+}
+.ac-select:hover{border-color:rgba(242,198,109,.5)}
+.ac-select:focus-visible{outline:2px solid rgba(242,198,109,.6);outline-offset:2px}
+.ac-select:disabled{opacity:.5;cursor:not-allowed}
+.ac-select option{background:#0a0f1a;color:var(--text)}
+.ac-status{margin:10px 0 0;font-size:12px;line-height:1.7;color:var(--faint)}
+.ac-status[data-state="good"]{color:var(--good)}
+.ac-status[data-state="bad"]{color:var(--blood)}
+.ac-diag{margin:6px 0 0;font-size:11px;line-height:1.6;color:var(--faint);word-break:break-word}
+.ac-diag[hidden]{display:none}
+
+@media (max-width:720px){
+  .ac-grid{grid-template-columns:1fr}
+  .ac-head{gap:10px}
+}
+

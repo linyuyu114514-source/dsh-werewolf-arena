@@ -136,6 +136,28 @@
       </div>
     </div>
 
+    <!-- AI 通道：这一局用哪个渠道、哪个模型。
+         列表由后端 GET /api/providers 动态列出（当前 DSH 接入的通道与模型），
+         选择存 localStorage，开局时随 POST /api/match 一起发给后端。 -->
+    <div class="achannel" id="channelPanel" data-state="idle">
+      <div class="ac-head">
+        <span class="ac-label">AI 通道</span>
+        <button class="btn-ghost btn-sm" id="channelRefresh" type="button">重新检测</button>
+      </div>
+      <div class="ac-grid">
+        <label class="ac-field" for="channelProvider">
+          <span class="ac-cap">通道</span>
+          <select class="ac-select" id="channelProvider" aria-label="选择 AI 通道"></select>
+        </label>
+        <label class="ac-field" for="channelModel">
+          <span class="ac-cap">模型</span>
+          <select class="ac-select" id="channelModel" aria-label="选择模型"></select>
+        </label>
+      </div>
+      <p class="ac-status" id="channelStatus" data-state="idle" role="status" aria-live="polite">正在检测可用通道…</p>
+      <p class="ac-diag" id="channelDiag" hidden></p>
+    </div>
+
     <div class="mode-grid" id="modeGrid" role="radiogroup" aria-label="选择游戏模式"></div>
 
     <div class="modes-foot">
@@ -361,6 +383,7 @@
 <script src="assets/rolecard.js"></script>
 <script src="assets/rules.js"></script>
 <script src="assets/game.js"></script>
+<script src="assets/channel.js"></script>
 <script src="assets/bridge.js"></script>
 <script src="assets/match.js"></script>
 <script src="assets/app.js"></script>

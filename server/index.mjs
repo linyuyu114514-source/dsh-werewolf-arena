@@ -10,6 +10,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createMatch, getMatch, dropMatch, dropAll } from './session/match.mjs';
 import { dshUsable, dshDiagnosis, authRoute, DSH_HOME_DIR } from './dsh/paths.mjs';
+import { listChannels, resolveChannel, currentChannel, channelLabel, warmChannels, cleanupProviderPlugins } from './dsh/providers.mjs';
+import { sweepStaleTemp } from './dsh/home.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -82,14 +84,46 @@ const server = http.createServer(async (req, res) => {
     if (url.startsWith('/api/')) {
       if (req.method === 'GET' && url === '/api/health') {
         const route = authRoute();
+        const pick = currentChannel();
         return json(res, 200, {
           ok: true,
           dsh: dshUsable(),
           runtime: process.version,
           auth: route.route,
-          provider: route.provider,
+          provider: pick.provider,
+          model: pick.model,
+          channelLabel: channelLabel(pick.provider),
           install: DSH_HOME_DIR,
           diagnosis: dshDiagnosis(),
+        });
+      }
+
+      /* 当前 DSH 接入了哪些通道、每个通道有哪些模型。
+         列表是从 DSH 自己嘴里问出来的（见 dsh/providers.mjs），不是写死的。
+         接口永远回 200：失败也把原因和兜底通道一起给前端，页面才好如实显示。 */
+      if (req.method === 'GET' && (url === '/api/providers' || url.indexOf('/api/providers?') === 0)) {
+        const force = /(^|[?&])refresh=1(&|$)/.test(url);
+        let snapshot;
+        try {
+          snapshot = await listChannels({ refresh: force });
+        } catch (e) {
+          return json(res, 200, {
+            ok: false,
+            cachedAt: Date.now(),
+            stale: true,
+            current: currentChannel(),
+            providers: [],
+            diagnostics: ['枚举通道失败：' + e.message],
+          });
+        }
+        const cur = currentChannel();
+        return json(res, 200, {
+          ok: snapshot.providers.length > 0,
+          cachedAt: snapshot.at,
+          stale: Date.now() - snapshot.at > 30_000,
+          current: cur,
+          providers: snapshot.providers,
+          diagnostics: snapshot.diagnostics || [],
         });
       }
 
@@ -99,7 +133,17 @@ const server = http.createServer(async (req, res) => {
         if (!seats.length) return json(res, 400, { error: 'seats 不能为空' });
         if (!dshUsable()) return json(res, 503, { error: dshDiagnosis() || 'DeepSeek Harness 不可用' });
 
-        const m = createMatch(seats);
+        /* 玩家在首页选的通道。没选就用当前默认通道；
+           选了但不可用（不在列表里 / 没登录）就如实拒绝，别开局后才发现。 */
+        let picked;
+        try {
+          picked = resolveChannel(body.channel);
+        } catch (e) {
+          return json(res, 500, { error: '通道校验失败：' + e.message });
+        }
+        if (!picked.ok) return json(res, 400, { error: picked.error });
+
+        const m = createMatch(seats, picked.channel);
         try {
           await m.start(seats);
         } catch (e) {
@@ -146,6 +190,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   const route = authRoute();
+  const pick = currentChannel();
   console.log('狼人杀后端已启动：http://127.0.0.1:' + PORT);
   console.log('DeepSeek Harness：' + DSH_HOME_DIR);
   console.log('子代理身份：' + (route.route === 'none'
@@ -153,10 +198,19 @@ server.listen(PORT, '127.0.0.1', () => {
     : route.route === 'api-key'
       ? 'API Key 通道'
       : 'DeepSeek Harness 已连接（复用桌面版登录态）'));
+  console.log('默认通道：' + (channelLabel(pick.provider) || pick.provider) + ' / ' + pick.model);
+  /* 上一局被硬关窗口留下的临时目录，顺手清掉 */
+  const stale = sweepStaleTemp();
+  if (stale.length) console.log('清理了 ' + stale.length + ' 个陈旧临时目录：' + stale.join('、'));
+  /* 后台先把"桌面版接入了哪些通道"问出来，免得玩家点开页面还要等十几秒。
+     预热失败不影响任何流程：真需要时 /api/providers 会现问一次。 */
+  warmChannels();
 });
 
 async function bye() {
   try { await dropAll(); } catch { /* ignore */ }
+  /* 借用插件的临时副本也一起收掉，别在系统临时目录里留东西 */
+  cleanupProviderPlugins();
   process.exit(0);
 }
 process.on('SIGINT', bye);

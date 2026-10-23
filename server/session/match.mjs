@@ -9,9 +9,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { DshRuntime } from '../dsh/runtime.mjs';
+import { DshRuntime, attemptsFor } from '../dsh/runtime.mjs';
 import { writePatch } from '../dsh/patch.mjs';
 import { writeRoster, sessionIdFor } from '../dsh/roster.mjs';
+import { seedHome } from '../dsh/home.mjs';
+import { materializeProviderPlugins, channelLabel } from '../dsh/providers.mjs';
 import { buildPrompt } from '../game/prompt.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
@@ -45,8 +47,13 @@ function toPayload(type, act) {
 }
 
 export class Match {
-  constructor(id) {
+  /**
+   * @param {string} id
+   * @param {object|null} [channel] 玩家这一局选的通道 {provider, model, reasoningEffort?}
+   */
+  constructor(id, channel) {
     this.id = id;
+    this.channel = channel || null;
     this.runtime = null;
     this.homeDir = '';
     this.seats = [];
@@ -64,14 +71,31 @@ export class Match {
 
     const patchPath = path.join(this.homeDir, 'patch.yml');
     const rosterPath = path.join(this.homeDir, 'roster.json');
+    const homeDir = path.join(this.homeDir, 'home');
+
+    /* 临时 DSH_HOME 里没有桌面版的登录态：把凭据与渠道台账复制进去
+       （复制而不是指原文件，游戏进程就不会回写到桌面版状态）。 */
+    const seeded = seedHome(homeDir);
+    this.seeded = seeded;
+    if (seeded.note) this.warnings.push(seeded.note);
 
     writeRoster({ outFile: rosterPath, matchId: this.id, seats });
-    writePatch({ outFile: patchPath, pluginPath: PLUGIN, rosterPath });
+    const readyFile = path.join(this.homeDir, 'providers.json');
+    writePatch({
+      outFile: patchPath,
+      pluginPath: PLUGIN,
+      rosterPath,
+      credentialsPath: seeded.credentialsPath,
+      providerPlugins: materializeProviderPlugins(),
+      readyFile,
+    });
 
     this.runtime = new DshRuntime({
       patchPath,
-      homeDir: path.join(this.homeDir, 'home'),
+      homeDir,
       cwd: ROOT,
+      channel: this.channel,
+      readyFile,
     });
     await this.runtime.start();
     return this;
@@ -93,7 +117,8 @@ export class Match {
     this.turns += 1;
     let act = null;
     let lastErr = null;
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    const attempts = attemptsFor(this.channel);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         /* 把本回合允许的行动种类告诉插件，插件据此拒绝越权提交 */
         this.runtime.child.send({ t: 'turn', sid, kinds: prompt.kinds, cands: prompt.cands });
@@ -112,7 +137,9 @@ export class Match {
       /* 优先报子进程自己吐出来的错误（Key 无效 / 额度用完 / 网络不通） */
       const problem = this.runtime ? this.runtime.lastProblem() : '';
       const why = problem || (lastErr ? lastErr.message : '子代理没有提交任何行动');
-      throw new Error('座位 ' + seat + '「' + (req.name || '') + '」无回应：' + why);
+      const rt = this.runtime;
+      const onChannel = rt ? '（通道 ' + (channelLabel(rt.provider) || rt.provider) + ' / ' + rt.model + '）' : '';
+      throw new Error('座位 ' + seat + '「' + (req.name || '') + '」无回应' + onChannel + '：' + why);
     }
     return toPayload(req.type, act);
   }
@@ -132,9 +159,9 @@ export class Match {
 
 const matches = new Map();
 
-export function createMatch(seats) {
+export function createMatch(seats, channel) {
   const id = 'm' + crypto.randomBytes(5).toString('hex');
-  const m = new Match(id);
+  const m = new Match(id, channel);
   matches.set(id, m);
   return m;
 }
